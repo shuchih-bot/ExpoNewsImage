@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Expo Daily Special Edition</title>
+  <style>
+    html, body { margin: 0; padding: 0; width: 100%; min-height: 100vh; background-color: #1a1a1a; font-family: sans-serif; }
+    .app-container { width: 100%; max-width: 500px; margin: 0 auto; background: #fff; min-height: 100vh; }
+    .form-box { padding: 30px; box-sizing: border-box; } 
+    h2 { border-bottom: 2px solid #333; padding-bottom: 10px; margin-bottom: 25px; color: #111; }
+    .form-group { margin-bottom: 20px; }
+    label { display: block; font-weight: bold; margin-bottom: 8px; font-size: 14px; color: #333; }
+    input { width: 100%; padding: 12px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; font-size: 16px; }
+    .btn { background: #d4a017; color: #fff; width: 100%; padding: 15px; border: none; border-radius: 4px; font-size: 18px; font-weight: bold; cursor: pointer; text-transform: uppercase; }
+    
+    #loading { display: none; text-align: center; padding: 100px 30px; font-weight: bold; color: #fff; line-height: 1.6; }
+    #resultContainer { display: none; width: 100%; margin: 0; padding: 0; background: #1a1a1a; box-sizing: border-box; }
+    #finalImage { width: 100%; height: auto; display: block; margin: 0; padding: 0; border: none; }
+    .notice { color: #fff; font-size: 13px; margin: 20px 15px; background: rgba(255,255,255,0.1); padding: 15px; border-radius: 6px; line-height: 1.5; text-align: center; }
+    .btn-padding { padding: 0 15px 40px 15px; }
+  </style>
+</head>
+<body>
+
+  <div class="app-container" id="mainWrapper">
+    <div id="loading">
+      <p id="loadingText">🎨 Designing your newspaper...<br>Please stay on this page.</p>
+    </div>
+
+    <div id="setupForm" class="form-box">
+      <h2>EXPO DAILY</h2>
+      <p style="color:#666; font-size:14px;">Create your own personalized headline news.</p>
+      <div class="form-group">
+        <label>Your Full Name</label>
+        <input type="text" id="userName" placeholder="Enter your name">
+      </div>
+      <div class="form-group">
+        <label>Email Address</label>
+        <input type="email" id="userEmail" placeholder="name@company.com">
+      </div>
+      <div class="form-group">
+        <label>Smile & Take a Photo</label>
+        <input type="file" id="userPhoto" accept="image/*" capture="environment">
+      </div>
+      <button class="btn" id="submitBtn" onclick="generateNewspaper()">Generate My News</button>
+    </div>
+
+    <div id="resultContainer">
+      <canvas id="hiddenCanvas" width="1080" height="1920" style="display:none;"></canvas>
+      <img id="finalImage" alt="Your Expo Daily Headline">
+      
+      <div class="notice">
+        📸 <b>SUCCESS! Please SCREENSHOT this page to share on LinkedIn / IG!</b><br>
+        (iPhone/Safari users can also long-press the image to save to photos.)<br><br>
+        🔥 <b>恭喜成功生成！請直接「手機截圖」保留您的專屬頭條！</b><br>
+        (使用 iPhone Safari 開啟者，亦可長按圖片直接儲存至相簿。)
+      </div>
+      
+      <div class="btn-padding">
+        <button class="btn" onclick="location.reload()">Create New One</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // --- ⚠️ 設定區 ---
+    // 1. 請填入您剛才在 Postimages 取得的六個月限時空白底圖網址
+    const TEMPLATE_URL = 'https://i.imgur.com/3Dfrdxf.jpg'; 
+    
+    // 2. 🚨 請把下面引號內，替換成您剛才在「步驟一複製的 GAS 網頁應用程式網址」
+    const GAS_BACKEND_URL = '請在這裡貼上你的script.google.com開頭的網址';
+    
+    const PHOTO_COORD = { x: 340, y: 650 }, PHOTO_SIZE = 400;                 
+    const NAME_COORD = { x: 540, y: 550 }, NAME_STYLE = "bold 48px 'Times New Roman'", NAME_COLOR = "#000000";
+
+    function generateNewspaper() {
+      const name = document.getElementById('userName').value;
+      const email = document.getElementById('userEmail').value;
+      const photoInput = document.getElementById('userPhoto');
+      
+      if(!name || !email || !photoInput.files[0]) { alert('Please fill all fields.'); return; }
+      
+      document.getElementById('setupForm').style.display = 'none';
+      document.getElementById('mainWrapper').style.backgroundColor = '#1a1a1a';
+      document.getElementById('loading').style.display = 'block';
+
+      const canvas = document.getElementById('hiddenCanvas'), ctx = canvas.getContext('2d');
+      const bgImg = new Image();
+      bgImg.crossOrigin = "anonymous"; 
+      bgImg.src = TEMPLATE_URL; 
+      
+      bgImg.onload = function() {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          const userImg = new Image();
+          userImg.src = e.target.result;
+          
+          userImg.onload = function() {
+            ctx.drawImage(bgImg, 0, 0, 1080, 1920);
+            const minSide = Math.min(userImg.width, userImg.height), sx = (userImg.width - minSide) / 2, sy = (userImg.height - minSide) / 2;
+            ctx.drawImage(userImg, sx, sy, minSide, minSide, PHOTO_COORD.x, PHOTO_COORD.y, PHOTO_SIZE, PHOTO_SIZE);
+            ctx.font = NAME_STYLE; ctx.fillStyle = NAME_COLOR; ctx.textAlign = "center";
+            ctx.fillText(name.toUpperCase(), NAME_COORD.x, NAME_COORD.y);
+            
+            const highResImageUrl = canvas.toDataURL('image/jpeg', 0.85);
+            document.getElementById('finalImage').src = highResImageUrl;
+            
+            const thumbBase64 = canvas.toDataURL('image/jpeg', 0.15);
+            
+            // 改用標準跨網域傳輸，將照片與名單送回公司試算表
+            fetch(GAS_BACKEND_URL, {
+              method: 'POST',
+              mode: 'no-cors', // 突破跨網域安全限制
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ name: name, email: email, base64Data: thumbBase64 })
+            }).then(() => {
+              document.getElementById('loading').style.display = 'none';
+              document.getElementById('resultContainer').style.display = 'block';
+            }).catch(err => {
+              alert("資料送出失敗，但圖片已合成完畢，請先截圖留存！");
+              document.getElementById('loading').style.display = 'none';
+              document.getElementById('resultContainer').style.display = 'block';
+            });
+          }
+        };
+        reader.readAsDataURL(photoInput.files[0]);
+      };
+    }
+  </script>
+</body>
+</html>
