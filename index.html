@@ -47,7 +47,9 @@
             <img id="qrImage" src="" alt="Redemption QR">
             <p id="qrEmailText"></p>
         </div>
-        <p class="hint">Long press the image above to save it to your gallery.</p>
+        <p class="hint">Present this at the service desk.</p>
+        
+        <button id="shareBtn" style="background-color: #28a745; margin-top: 15px;">📤 Share / Save Photo</button>
     </div>
 </div>
 
@@ -61,6 +63,7 @@
     const video = document.getElementById('video');
     const canvas = document.getElementById('canvas');
     const captureBtn = document.getElementById('captureBtn');
+    const shareBtn = document.getElementById('shareBtn');
     const loadingMsg = document.getElementById('loadingMsg');
     const inputArea = document.getElementById('inputArea');
     const boothTitle = document.getElementById('boothTitle');
@@ -71,7 +74,7 @@
     let currentBoothData = null;
     let threshold = 3; 
 
-    // 1. Get Camera
+    // 1. Get Camera Stream
     navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } })
         .then(stream => { video.srcObject = stream; })
         .catch(err => { 
@@ -79,7 +82,7 @@
             loadingMsg.style.color = "red";
         });
 
-    // 2. Fetch Settings from GAS (including dynamic coords)
+    // 2. Fetch Settings from GAS
     fetch(`${GAS_BACKEND_URL}?action=get_settings`)
         .then(res => res.json())
         .then(data => {
@@ -106,7 +109,7 @@
             console.error(err);
         });
 
-    // 3. Render and Capture Logic (CROP, NO SCALE)
+    // 3. Render, Crop and Capture Logic
     captureBtn.addEventListener('click', () => {
         const name = document.getElementById('userName').value.trim();
         let email = document.getElementById('userEmail').value.trim();
@@ -122,41 +125,37 @@
         captureBtn.innerText = "Processing...";
 
         // Parse dynamic settings from main Google Sheet
-        const [pX, pY] = currentBoothData.photoPos.split(',').map(Number); // D欄
-        const [pW, pH] = currentBoothData.photoSize.split('*').map(Number); // E欄
-        const [nX, nY] = currentBoothData.namePos.split(',').map(Number); // F欄
-        const fSize = currentBoothData.fontSize; // G欄
+        const [pX, pY] = currentBoothData.photoPos.split(',').map(Number); 
+        const [pW, pH] = currentBoothData.photoSize.split('*').map(Number); 
+        const [nX, nY] = currentBoothData.namePos.split(',').map(Number); 
+        const fSize = currentBoothData.fontSize; 
 
         // Set canvas to match backdrop image size
         canvas.width = bgImage.width;
         canvas.height = bgImage.height;
         const ctx = canvas.getContext('2d');
         
-        // Drawbackdrop
+        // Draw backdrop
         ctx.drawImage(bgImage, 0, 0);
         
-        // --- CROP LOGIC ---
-        // Calculate centered cropping parameters to fit the target box ratio (W/H)
+        // --- CENTERED CROP LOGIC ---
         const dAR = pW / pH; // Target ratio from sheet
         const sAR = video.videoWidth / video.videoHeight; // Camera ratio
-
         let sx, sy, sWidth, sHeight;
 
         if (dAR > sAR) {
-            // Target box is wider: use full video width, crop height
             sWidth = video.videoWidth;
             sHeight = video.videoWidth / dAR;
             sx = 0;
-            sy = (video.videoHeight - sHeight) / 2; // Center Y
+            sy = (video.videoHeight - sHeight) / 2; 
         } else {
-            // Target box is taller: use full video height, crop width
             sHeight = video.videoHeight;
             sWidth = video.videoHeight * dAR;
-            sx = (video.videoWidth - sWidth) / 2; // Center X
+            sx = (video.videoWidth - sWidth) / 2; 
             sy = 0;
         }
 
-        // Advanced 9-argument drawImage for precise centered cropping
+        // Advanced centered cropping
         ctx.drawImage(video, sx, sy, sWidth, sHeight, pX, pY, pW, pH);
         
         // --- Draw Name ---
@@ -172,14 +171,14 @@
         canvas.style.display = "block";
         document.getElementById('resultArea').style.display = "block";
         
-        // Success Message with Dynamic "n"
+        // Success Message with Dynamic Threshold Count
         document.getElementById('successMsg').innerHTML = `Collect <b>${threshold}</b> different booth photos, then present this QR code at the service desk for an exclusive gift.`;
         
         // Generate QR Code
         document.getElementById('qrImage').src = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(email)}`;
         document.getElementById('qrEmailText').innerText = `ID: ${email}`;
 
-        // Async Upload
+        // Async Upload to Google Sheet
         fetch(GAS_BACKEND_URL, {
             method: 'POST',
             body: JSON.stringify({
@@ -190,6 +189,31 @@
                 photo: photoData
             })
         });
+    });
+
+    // 4. Web Share API Logic (Native share dialog)
+    shareBtn.addEventListener('click', async () => {
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+        try {
+            const blob = await (await fetch(dataUrl)).blob();
+            const file = new File([blob], 'POSRICH_Passport.jpg', { type: 'image/jpeg' });
+
+            if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                await navigator.share({
+                    files: [file],
+                    title: 'POSRICH Expo Passport',
+                    text: 'Here is my POSRICH Expo Digital Passport!'
+                });
+            } else {
+                // Fallback: Trigger direct download if Web Share API is not supported
+                const link = document.createElement('a');
+                link.download = 'POSRICH_Passport.jpg';
+                link.href = dataUrl;
+                link.click();
+            }
+        } catch (error) {
+            console.log('Sharing omitted or canceled by user.', error);
+        }
     });
 </script>
 
