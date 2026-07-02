@@ -1,132 +1,96 @@
 <!DOCTYPE html>
-<html>
+<html lang="zh-TW">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Expo Daily Special Edition</title>
-  <style>
-    html, body { margin: 0; padding: 0; width: 100%; min-height: 100vh; background-color: #1a1a1a; font-family: sans-serif; }
-    .app-container { width: 100%; max-width: 500px; margin: 0 auto; background: #fff; min-height: 100vh; }
-    .form-box { padding: 30px; box-sizing: border-box; } 
-    h2 { border-bottom: 2px solid #333; padding-bottom: 10px; margin-bottom: 25px; color: #111; }
-    .form-group { margin-bottom: 20px; }
-    label { display: block; font-weight: bold; margin-bottom: 8px; font-size: 14px; color: #333; }
-    input { width: 100%; padding: 12px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; font-size: 16px; }
-    .btn { background: #d4a017; color: #fff; width: 100%; padding: 15px; border: none; border-radius: 4px; font-size: 18px; font-weight: bold; cursor: pointer; text-transform: uppercase; }
-    
-    #loading { display: none; text-align: center; padding: 100px 30px; font-weight: bold; color: #fff; line-height: 1.6; }
-    #resultContainer { display: none; width: 100%; margin: 0; padding: 0; background: #1a1a1a; box-sizing: border-box; }
-    #finalImage { width: 100%; height: auto; display: block; margin: 0; padding: 0; border: none; }
-    .notice { color: #fff; font-size: 13px; margin: 20px 15px; background: rgba(255,255,255,0.1); padding: 15px; border-radius: 6px; line-height: 1.5; text-align: center; }
-    .btn-padding { padding: 0 15px 40px 15px; }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>跨攤位智慧展會 - 專屬頭條拍照</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <style>
+        body { margin: 0; padding: 0; background-color: #1a1a1a; color: white; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
+        #header { width: 100%; padding: 15px; background-color: #333; text-align: center; font-size: 1.2rem; font-weight: bold; box-sizing: border-box; }
+        #camera-container { position: relative; width: 100%; max-width: 500px; aspect-ratio: 3/4; background-color: #000; overflow: hidden; margin-top: 20px; }
+        video { width: 100%; height: 100%; object-fit: cover; }
+        canvas { display: none; }
+        .btn { padding: 15px 30px; font-size: 1.2rem; background-color: #007bff; color: white; border: none; border-radius: 8px; cursor: pointer; margin-top: 20px; width: 80%; max-width: 300px; font-weight: bold; }
+        .btn:active { background-color: #0056b3; }
+        #form-container, #result-container, #loading-container { display: none; flex-direction: column; align-items: center; width: 100%; max-width: 400px; padding: 20px; box-sizing: border-box; }
+        input { width: 100%; padding: 12px; margin: 10px 0; font-size: 1rem; border-radius: 5px; border: 1px solid #ccc; box-sizing: border-box; }
+        #result-image { width: 100%; border: 3px solid white; border-radius: 8px; margin-bottom: 20px; }
+        #qrcode-box { background: white; padding: 15px; border-radius: 8px; display: flex; flex-direction: column; align-items: center; margin-top: 15px; width: 80%; }
+        #qrcode-box p { color: #333; font-weight: bold; margin: 0 0 10px 0; font-size: 0.9rem; text-align: center; }
+        .spinner { border: 4px solid rgba(255,255,255,0.3); border-top: 4px solid white; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin-bottom: 15px; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
 </head>
 <body>
 
-  <div class="app-container" id="mainWrapper">
-    <div id="loading">
-      <p id="loadingText">🎨 Designing your newspaper...<br>Please stay on this page.</p>
+    <div id="header">讀取攤位設定中...</div>
+
+    <div id="loading-container" style="display: flex; margin-top: 50px;">
+        <div class="spinner"></div>
+        <div id="loading-text">連線至中央系統...</div>
     </div>
 
-    <div id="setupForm" class="form-box">
-      <h2>EXPO DAILY</h2>
-      <p style="color:#666; font-size:14px;">Create your own personalized headline news.</p>
-      <div class="form-group">
-        <label>Your Full Name</label>
-        <input type="text" id="userName" placeholder="Enter your name">
-      </div>
-      <div class="form-group">
-        <label>Email Address</label>
-        <input type="email" id="userEmail" placeholder="name@company.com">
-      </div>
-      <div class="form-group">
-        <label>Smile & Take a Photo</label>
-        <input type="file" id="userPhoto" accept="image/*" capture="environment">
-      </div>
-      <button class="btn" id="submitBtn" onclick="generateNewspaper()">Generate My News</button>
+    <video id="video" autoplay playsinline></video>
+    <div id="camera-container" style="display: none;">
+        <button id="capture-btn" class="btn">📸 拍下專屬頭條</button>
+    </div>
+    <canvas id="canvas"></canvas>
+
+    <div id="form-container">
+        <h3>✨ 照片已生成，請輸入資料以解鎖</h3>
+        <input type="text" id="user-name" placeholder="您的姓名或稱呼" required>
+        <input type="email" id="user-email" placeholder="您的 Email (兌獎唯一憑證)" required>
+        <button id="submit-btn" class="btn">🚀 送出並獲取護照</button>
     </div>
 
-    <div id="resultContainer">
-      <canvas id="hiddenCanvas" width="1080" height="1920" style="display:none;"></canvas>
-      <img id="finalImage" alt="Your Expo Daily Headline">
-      
-      <div class="notice">
-        📸 <b>SUCCESS! Please SCREENSHOT this page to share on LinkedIn / IG!</b><br>
-        (iPhone/Safari users can also long-press the image to save to photos.)<br><br>
-        🔥 <b>恭喜成功生成！請直接「手機截圖」保留您的專屬頭條！</b><br>
-        (使用 iPhone Safari 開啟者，亦可長按圖片直接儲存至相簿。)
-      </div>
-      
-      <div class="btn-padding">
-        <button class="btn" onclick="location.reload()">Create New One</button>
-      </div>
+    <div id="result-container">
+        <h3 style="color: #4CAF50;">🎉 成功！長按下方圖片即可儲存</h3>
+        <img id="result-image" alt="您的專屬頭條">
+        <div id="qrcode-box">
+            <p>您的數位闖關護照<br><span id="display-email" style="color:#007bff;"></span></p>
+            <div id="qrcode"></div>
+            <p style="font-size: 0.75rem; color: #666; margin-top: 10px;">請至服務台出示此條碼核銷</p>
+        </div>
     </div>
-  </div>
 
-  <script>
-    // --- ⚠️ 設定區 ---
-    // 1. 請填入您剛才在 Postimages 取得的六個月限時空白底圖網址
-    const TEMPLATE_URL = 'https://i.postimg.cc/qMvqgCf8/Image-a3ic8xa3ic8xa3ic.jpg'; 
-    
-    // 2. 🚨 請把下面引號內，替換成您剛才在「步驟一複製的 GAS 網頁應用程式網址」
-    const GAS_BACKEND_URL = 'https://script.google.com/macros/s/AKfycby1IIZyZXJI3uoxbuzssFaSPTILGu7pN3fhZb1gN9rBFcDi0MWfrnTKOnE44zlsHVs/exec';
-    
-    const PHOTO_COORD = { x: 340, y: 650 }, PHOTO_SIZE = 400;                 
-    const NAME_COORD = { x: 540, y: 550 }, NAME_STYLE = "bold 48px 'Times New Roman'", NAME_COLOR = "#000000";
+    <script>
+        // 1. 核心參數設定
+        const GAS_BACKEND_URL = "https://script.google.com/macros/s/AKfycbz027yKpTWY-HGKlRS1ScGd2zOH_efBUENCLsPGsA6PABsV_h73ArVMRWJQ_pG8kPI_/exec";
+        
+        // 抓取網址後面的 ?booth= 參數，若無則預設為 A
+        const urlParams = new URLSearchParams(window.location.search);
+        const BOOTH_ID = (urlParams.get('booth') || 'A').toUpperCase();
+        
+        let boothData = null;
+        let bgImage = new Image();
+        bgImage.crossOrigin = "Anonymous"; // 允許跨域繪製畫布
 
-    function generateNewspaper() {
-      const name = document.getElementById('userName').value;
-      const email = document.getElementById('userEmail').value;
-      const photoInput = document.getElementById('userPhoto');
-      
-      if(!name || !email || !photoInput.files[0]) { alert('Please fill all fields.'); return; }
-      
-      document.getElementById('setupForm').style.display = 'none';
-      document.getElementById('mainWrapper').style.backgroundColor = '#1a1a1a';
-      document.getElementById('loading').style.display = 'block';
-
-      const canvas = document.getElementById('hiddenCanvas'), ctx = canvas.getContext('2d');
-      const bgImg = new Image();
-      bgImg.crossOrigin = "anonymous"; 
-      bgImg.src = TEMPLATE_URL; 
-      
-      bgImg.onload = function() {
-        const reader = new FileReader();
-        reader.onload = function(e) {
-          const userImg = new Image();
-          userImg.src = e.target.result;
-          
-          userImg.onload = function() {
-            ctx.drawImage(bgImg, 0, 0, 1080, 1920);
-            const minSide = Math.min(userImg.width, userImg.height), sx = (userImg.width - minSide) / 2, sy = (userImg.height - minSide) / 2;
-            ctx.drawImage(userImg, sx, sy, minSide, minSide, PHOTO_COORD.x, PHOTO_COORD.y, PHOTO_SIZE, PHOTO_SIZE);
-            ctx.font = NAME_STYLE; ctx.fillStyle = NAME_COLOR; ctx.textAlign = "center";
-            ctx.fillText(name.toUpperCase(), NAME_COORD.x, NAME_COORD.y);
-            
-            const highResImageUrl = canvas.toDataURL('image/jpeg', 0.85);
-            document.getElementById('finalImage').src = highResImageUrl;
-            
-            const thumbBase64 = canvas.toDataURL('image/jpeg', 0.15);
-            
-            // 改用標準跨網域傳輸，將照片與名單送回公司試算表
-            fetch(GAS_BACKEND_URL, {
-              method: 'POST',
-              mode: 'no-cors', // 突破跨網域安全限制
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ name: name, email: email, base64Data: thumbBase64 })
-            }).then(() => {
-              document.getElementById('loading').style.display = 'none';
-              document.getElementById('resultContainer').style.display = 'block';
-            }).catch(err => {
-              alert("資料送出失敗，但圖片已合成完畢，請先截圖留存！");
-              document.getElementById('loading').style.display = 'none';
-              document.getElementById('resultContainer').style.display = 'block';
-            });
-          }
-        };
-        reader.readAsDataURL(photoInput.files[0]);
-      };
-    }
-  </script>
-</body>
-</html>
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const header = document.getElementById('header');
+        
+        // 2. 初始化：向 GAS 抓取攤位底圖設定
+        window.onload = async () => {
+            try {
+                const response = await fetch(GAS_BACKEND_URL + "?action=get_settings");
+                const data = await response.json();
+                
+                if (data.status === "success") {
+                    // 在陣列中尋找符合網址參數的攤位代號
+                    const booth = data.booths.find(b => b.id.toUpperCase() === BOOTH_ID);
+                    if (booth) {
+                        boothData = booth;
+                        header.innerText = `📍 目前位置：${booth.name}`;
+                        bgImage.src = booth.bgUrl;
+                        
+                        bgImage.onload = () => {
+                            startCamera();
+                        };
+                        bgImage.onerror = () => {
+                            alert("攤位底圖載入失敗，請確認試算表中填寫的 Postimages 網址是否正確。");
+                        }
+                    } else {
+                        header.innerText = "❌ 找不到此攤位代號";
+                        document.getElementById('loading-text').
