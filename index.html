@@ -1,50 +1,53 @@
 <!DOCTYPE html>
-<html lang="zh-TW">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>POSRICH 智慧展會打卡系統</title>
+    <title>POSRICH Expo Photo System</title>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; background-color: #f4f4f9; margin: 0; padding: 20px; }
-        .container { max-width: 500px; margin: 0 auto; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
-        h2 { color: #333; font-size: 20px; }
-        #loadingMsg { color: #ff9800; font-weight: bold; margin-bottom: 15px; }
-        video, canvas { width: 100%; max-width: 400px; border-radius: 8px; margin-bottom: 15px; background-color: #000; }
+        body { font-family: 'Segoe UI', Arial, sans-serif; text-align: center; background-color: #f0f2f5; margin: 0; padding: 20px; }
+        .container { max-width: 500px; margin: 0 auto; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        h2 { color: #1a1a1a; margin-top: 0; }
+        #loadingMsg { color: #f39c12; font-weight: bold; margin-bottom: 15px; }
+        video, canvas { width: 100%; max-width: 450px; border-radius: 8px; margin-bottom: 15px; background-color: #000; }
         canvas { display: none; }
-        input { width: 90%; padding: 12px; margin: 10px 0; border: 1px solid #ccc; border-radius: 6px; font-size: 16px; box-sizing: border-box; }
-        button { background-color: #0056b3; color: white; border: none; padding: 14px 20px; font-size: 18px; border-radius: 6px; cursor: pointer; width: 90%; font-weight: bold; }
-        button:hover { background-color: #004494; }
-        button:disabled { background-color: #cccccc; cursor: not-allowed; }
-        #resultArea { display: none; margin-top: 20px; padding-top: 20px; border-top: 2px dashed #eee; }
-        .qr-box { margin-top: 15px; padding: 15px; background: #f9f9f9; border-radius: 8px; }
+        input { width: 90%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 6px; font-size: 16px; box-sizing: border-box; }
+        button { background-color: #007bff; color: white; border: none; padding: 14px 20px; font-size: 18px; border-radius: 6px; cursor: pointer; width: 90%; font-weight: bold; }
+        button:hover { background-color: #0056b3; }
+        button:disabled { background-color: #ccc; cursor: not-allowed; }
+        #resultArea { display: none; margin-top: 20px; border-top: 2px dashed #eee; padding-top: 20px; }
+        .success-box { background-color: #e3fdfd; padding: 15px; border-radius: 8px; border: 1px solid #cbf1f5; margin-bottom: 15px; }
+        .qr-box { margin-top: 15px; background: #fafafa; padding: 15px; border-radius: 8px; }
         .qr-box img { width: 150px; height: 150px; }
-        .qr-box p { font-size: 14px; color: #666; margin-top: 10px; font-weight: bold; }
-        .hint { font-size: 12px; color: #888; margin-top: 15px; }
+        .qr-box p { font-size: 14px; color: #333; margin-top: 10px; font-family: monospace; }
+        .hint { font-size: 12px; color: #999; margin-top: 15px; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h2 id="boothTitle">POSRICH 展會系統載入中...</h2>
-    <div id="loadingMsg">正在與中央控制台連線獲取設定...</div>
+    <h2 id="boothTitle">Loading System...</h2>
+    <div id="loadingMsg">Connecting to POSRICH Cloud Server...</div>
     
     <video id="video" autoplay playsinline></video>
     <canvas id="canvas"></canvas>
     
     <div id="inputArea" style="display:none;">
-        <input type="text" id="userName" placeholder="請輸入您的姓名 (Name)" required>
-        <input type="email" id="userEmail" placeholder="請輸入您的 Email (重要：兌獎憑證)" required>
-        <button id="captureBtn">拍照並產生數位護照</button>
+        <input type="text" id="userName" placeholder="Full Name (Max 20 chars)" maxlength="20">
+        <input type="email" id="userEmail" placeholder="Email Address (For redemption)">
+        <button id="captureBtn">Generate Digital Passport</button>
     </div>
 
     <div id="resultArea">
-        <h3 style="color: #28a745;">🎉 打卡成功！請截圖保存此畫面</h3>
-        <p>您的照片已合成完畢，請至服務台出示下方條碼兌換精美禮品。</p>
+        <div class="success-box">
+            <h3 style="color: #27ae60; margin: 0 0 10px 0;">Success! Photo Generated</h3>
+            <p id="successMsg" style="margin: 0; font-size: 15px; line-height: 1.4;"></p>
+        </div>
         <div class="qr-box">
-            <img id="qrImage" src="" alt="數位護照 QR Code">
+            <img id="qrImage" src="" alt="Redemption QR">
             <p id="qrEmailText"></p>
         </div>
-        <p class="hint">長按上方報紙圖片可儲存至手機相簿</p>
+        <p class="hint">Long press the image above to save it to your gallery.</p>
     </div>
 </div>
 
@@ -52,11 +55,9 @@
     // 您的專屬中央大腦 API 網址
     const GAS_BACKEND_URL = "https://script.google.com/macros/s/AKfycbz027yKpTWY-HGKlRS1ScGd2zOH_efBUENCLsPGsA6PABsV_h73ArVMRWJQ_pG8kPI_/exec";
     
-    // 讀取網址參數 (例如 index.html?booth=A)
     const urlParams = new URLSearchParams(window.location.search);
-    const boothId = urlParams.get('booth') || 'A'; // 若未指定則預設為 A
+    const boothId = urlParams.get('booth') || 'A';
     
-    // 變數宣告
     const video = document.getElementById('video');
     const canvas = document.getElementById('canvas');
     const captureBtn = document.getElementById('captureBtn');
@@ -65,31 +66,35 @@
     const boothTitle = document.getElementById('boothTitle');
     
     let bgImage = new Image();
-    bgImage.crossOrigin = "anonymous"; // 防止 Canvas 輸出時被 CORS 阻擋
+    bgImage.crossOrigin = "anonymous";
     
-    // 1. 啟動攝影機
+    let currentBoothData = null;
+    let threshold = 3; 
+
+    // 1. Get Camera
     navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } })
         .then(stream => { video.srcObject = stream; })
         .catch(err => { 
-            loadingMsg.innerText = "🚨 無法存取攝影機，請確認瀏覽器權限設定。";
+            loadingMsg.innerText = "Error: Camera access denied. Please check permissions.";
             loadingMsg.style.color = "red";
         });
 
-    // 2. 向後端索取系統設定與底圖
+    // 2. Fetch Settings from GAS (including dynamic coords)
     fetch(`${GAS_BACKEND_URL}?action=get_settings`)
         .then(res => res.json())
         .then(data => {
             if (data.status === "success") {
-                const boothData = data.booths.find(b => b.id === boothId);
-                if (boothData) {
-                    boothTitle.innerText = `歡迎來到：${boothData.name}`;
-                    bgImage.src = boothData.bgUrl;
+                threshold = data.threshold;
+                currentBoothData = data.booths.find(b => b.id === boothId);
+                if (currentBoothData) {
+                    boothTitle.innerText = `${currentBoothData.name}`;
+                    bgImage.src = currentBoothData.bgUrl;
                     bgImage.onload = () => {
                         loadingMsg.style.display = "none";
                         inputArea.style.display = "block";
                     };
                 } else {
-                    loadingMsg.innerText = `🚨 錯誤：找不到代號為 [${boothId}] 的攤位設定。`;
+                    loadingMsg.innerText = `Error: Booth [${boothId}] not found in settings.`;
                     loadingMsg.style.color = "red";
                 }
             } else {
@@ -97,58 +102,84 @@
             }
         })
         .catch(err => {
-            loadingMsg.innerText = "🚨 設定檔讀取失敗，請聯絡現場人員。";
+            loadingMsg.innerText = "Error connecting to POSRICH server.";
             console.error(err);
         });
 
-    // 3. 拍照與合成邏輯
+    // 3. Render and Capture Logic (CROP, NO SCALE)
     captureBtn.addEventListener('click', () => {
         const name = document.getElementById('userName').value.trim();
         let email = document.getElementById('userEmail').value.trim();
         
-        if (!name || !email) {
-            alert("請完整填寫姓名與 Email");
+        if (!name || !email || !currentBoothData) {
+            alert("Please provide both Name and Email.");
             return;
         }
 
-        // 強制 Email 轉小寫 (防呆機制)
-        email = email.toLowerCase();
+        email = email.toLowerCase(); // Force lowercase for uniqueness
         
         captureBtn.disabled = true;
-        captureBtn.innerText = "處理中，請稍候...";
+        captureBtn.innerText = "Processing...";
 
-        // 設定 Canvas 尺寸與底圖一致
+        // Parse dynamic settings from main Google Sheet
+        const [pX, pY] = currentBoothData.photoPos.split(',').map(Number); // D欄
+        const [pW, pH] = currentBoothData.photoSize.split('*').map(Number); // E欄
+        const [nX, nY] = currentBoothData.namePos.split(',').map(Number); // F欄
+        const fSize = currentBoothData.fontSize; // G欄
+
+        // Set canvas to match backdrop image size
         canvas.width = bgImage.width;
         canvas.height = bgImage.height;
         const ctx = canvas.getContext('2d');
         
-        // 繪製背景圖
-        ctx.drawImage(bgImage, 0, 0, canvas.width, canvas.height);
+        // Drawbackdrop
+        ctx.drawImage(bgImage, 0, 0);
         
-        // 計算攝影機畫面寫入位置 (此處以置中為例，請依實際底圖留空位置調整)
-        // 假設要在畫布正中央貼上 400x300 的照片
-        const drawWidth = 400;
-        const drawHeight = 300;
-        const drawX = (canvas.width - drawWidth) / 2;
-        const drawY = (canvas.height - drawHeight) / 2;
+        // --- CROP LOGIC ---
+        // Calculate centered cropping parameters to fit the target box ratio (W/H)
+        const dAR = pW / pH; // Target ratio from sheet
+        const sAR = video.videoWidth / video.videoHeight; // Camera ratio
+
+        let sx, sy, sWidth, sHeight;
+
+        if (dAR > sAR) {
+            // Target box is wider: use full video width, crop height
+            sWidth = video.videoWidth;
+            sHeight = video.videoWidth / dAR;
+            sx = 0;
+            sy = (video.videoHeight - sHeight) / 2; // Center Y
+        } else {
+            // Target box is taller: use full video height, crop width
+            sHeight = video.videoHeight;
+            sWidth = video.videoHeight * dAR;
+            sx = (video.videoWidth - sWidth) / 2; // Center X
+            sy = 0;
+        }
+
+        // Advanced 9-argument drawImage for precise centered cropping
+        ctx.drawImage(video, sx, sy, sWidth, sHeight, pX, pY, pW, pH);
         
-        ctx.drawImage(video, drawX, drawY, drawWidth, drawHeight);
+        // --- Draw Name ---
+        ctx.fillStyle = "black"; 
+        ctx.font = `bold ${fSize}px Arial`;
+        ctx.fillText(name, nX, nY);
         
-        // 轉為 Base64
         const photoData = canvas.toDataURL('image/jpeg', 0.8);
         
-        // 畫面切換：隱藏攝影機，顯示合成圖與 QR Code
+        // UI Transition
         video.style.display = "none";
         inputArea.style.display = "none";
         canvas.style.display = "block";
-        canvas.style.width = "100%"; 
         document.getElementById('resultArea').style.display = "block";
         
-        // 產生 QR Code (使用免費 API)
+        // Success Message with Dynamic "n"
+        document.getElementById('successMsg').innerHTML = `Collect <b>${threshold}</b> different booth photos, then present this QR code at the service desk for an exclusive gift.`;
+        
+        // Generate QR Code
         document.getElementById('qrImage').src = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(email)}`;
         document.getElementById('qrEmailText').innerText = `ID: ${email}`;
 
-        // 背景非同步上傳至 GAS
+        // Async Upload
         fetch(GAS_BACKEND_URL, {
             method: 'POST',
             body: JSON.stringify({
@@ -158,8 +189,6 @@
                 email: email,
                 photo: photoData
             })
-        }).catch(err => {
-            console.warn("上傳延遲，但前端體驗已完成放行", err);
         });
     });
 </script>
