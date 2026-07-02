@@ -2,95 +2,167 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>跨攤位智慧展會 - 專屬頭條拍照</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>POSRICH 智慧展會打卡系統</title>
     <style>
-        body { margin: 0; padding: 0; background-color: #1a1a1a; color: white; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
-        #header { width: 100%; padding: 15px; background-color: #333; text-align: center; font-size: 1.2rem; font-weight: bold; box-sizing: border-box; }
-        #camera-container { position: relative; width: 100%; max-width: 500px; aspect-ratio: 3/4; background-color: #000; overflow: hidden; margin-top: 20px; }
-        video { width: 100%; height: 100%; object-fit: cover; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; background-color: #f4f4f9; margin: 0; padding: 20px; }
+        .container { max-width: 500px; margin: 0 auto; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        h2 { color: #333; font-size: 20px; }
+        #loadingMsg { color: #ff9800; font-weight: bold; margin-bottom: 15px; }
+        video, canvas { width: 100%; max-width: 400px; border-radius: 8px; margin-bottom: 15px; background-color: #000; }
         canvas { display: none; }
-        .btn { padding: 15px 30px; font-size: 1.2rem; background-color: #007bff; color: white; border: none; border-radius: 8px; cursor: pointer; margin-top: 20px; width: 80%; max-width: 300px; font-weight: bold; }
-        .btn:active { background-color: #0056b3; }
-        #form-container, #result-container, #loading-container { display: none; flex-direction: column; align-items: center; width: 100%; max-width: 400px; padding: 20px; box-sizing: border-box; }
-        input { width: 100%; padding: 12px; margin: 10px 0; font-size: 1rem; border-radius: 5px; border: 1px solid #ccc; box-sizing: border-box; }
-        #result-image { width: 100%; border: 3px solid white; border-radius: 8px; margin-bottom: 20px; }
-        #qrcode-box { background: white; padding: 15px; border-radius: 8px; display: flex; flex-direction: column; align-items: center; margin-top: 15px; width: 80%; }
-        #qrcode-box p { color: #333; font-weight: bold; margin: 0 0 10px 0; font-size: 0.9rem; text-align: center; }
-        .spinner { border: 4px solid rgba(255,255,255,0.3); border-top: 4px solid white; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin-bottom: 15px; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        input { width: 90%; padding: 12px; margin: 10px 0; border: 1px solid #ccc; border-radius: 6px; font-size: 16px; box-sizing: border-box; }
+        button { background-color: #0056b3; color: white; border: none; padding: 14px 20px; font-size: 18px; border-radius: 6px; cursor: pointer; width: 90%; font-weight: bold; }
+        button:hover { background-color: #004494; }
+        button:disabled { background-color: #cccccc; cursor: not-allowed; }
+        #resultArea { display: none; margin-top: 20px; padding-top: 20px; border-top: 2px dashed #eee; }
+        .qr-box { margin-top: 15px; padding: 15px; background: #f9f9f9; border-radius: 8px; }
+        .qr-box img { width: 150px; height: 150px; }
+        .qr-box p { font-size: 14px; color: #666; margin-top: 10px; font-weight: bold; }
+        .hint { font-size: 12px; color: #888; margin-top: 15px; }
     </style>
 </head>
 <body>
 
-    <div id="header">讀取攤位設定中...</div>
-
-    <div id="loading-container" style="display: flex; margin-top: 50px;">
-        <div class="spinner"></div>
-        <div id="loading-text">連線至中央系統...</div>
-    </div>
-
+<div class="container">
+    <h2 id="boothTitle">POSRICH 展會系統載入中...</h2>
+    <div id="loadingMsg">正在與中央控制台連線獲取設定...</div>
+    
     <video id="video" autoplay playsinline></video>
-    <div id="camera-container" style="display: none;">
-        <button id="capture-btn" class="btn">📸 拍下專屬頭條</button>
-    </div>
     <canvas id="canvas"></canvas>
-
-    <div id="form-container">
-        <h3>✨ 照片已生成，請輸入資料以解鎖</h3>
-        <input type="text" id="user-name" placeholder="您的姓名或稱呼" required>
-        <input type="email" id="user-email" placeholder="您的 Email (兌獎唯一憑證)" required>
-        <button id="submit-btn" class="btn">🚀 送出並獲取護照</button>
+    
+    <div id="inputArea" style="display:none;">
+        <input type="text" id="userName" placeholder="請輸入您的姓名 (Name)" required>
+        <input type="email" id="userEmail" placeholder="請輸入您的 Email (重要：兌獎憑證)" required>
+        <button id="captureBtn">拍照並產生數位護照</button>
     </div>
 
-    <div id="result-container">
-        <h3 style="color: #4CAF50;">🎉 成功！長按下方圖片即可儲存</h3>
-        <img id="result-image" alt="您的專屬頭條">
-        <div id="qrcode-box">
-            <p>您的數位闖關護照<br><span id="display-email" style="color:#007bff;"></span></p>
-            <div id="qrcode"></div>
-            <p style="font-size: 0.75rem; color: #666; margin-top: 10px;">請至服務台出示此條碼核銷</p>
+    <div id="resultArea">
+        <h3 style="color: #28a745;">🎉 打卡成功！請截圖保存此畫面</h3>
+        <p>您的照片已合成完畢，請至服務台出示下方條碼兌換精美禮品。</p>
+        <div class="qr-box">
+            <img id="qrImage" src="" alt="數位護照 QR Code">
+            <p id="qrEmailText"></p>
         </div>
+        <p class="hint">長按上方報紙圖片可儲存至手機相簿</p>
     </div>
+</div>
 
-    <script>
-        // 1. 核心參數設定
-        const GAS_BACKEND_URL = "https://script.google.com/macros/s/AKfycbz027yKpTWY-HGKlRS1ScGd2zOH_efBUENCLsPGsA6PABsV_h73ArVMRWJQ_pG8kPI_/exec";
-        
-        // 抓取網址後面的 ?booth= 參數，若無則預設為 A
-        const urlParams = new URLSearchParams(window.location.search);
-        const BOOTH_ID = (urlParams.get('booth') || 'A').toUpperCase();
-        
-        let boothData = null;
-        let bgImage = new Image();
-        bgImage.crossOrigin = "Anonymous"; // 允許跨域繪製畫布
+<script>
+    // 您的專屬中央大腦 API 網址
+    const GAS_BACKEND_URL = "https://script.google.com/macros/s/AKfycbz027yKpTWY-HGKlRS1ScGd2zOH_efBUENCLsPGsA6PABsV_h73ArVMRWJQ_pG8kPI_/exec";
+    
+    // 讀取網址參數 (例如 index.html?booth=A)
+    const urlParams = new URLSearchParams(window.location.search);
+    const boothId = urlParams.get('booth') || 'A'; // 若未指定則預設為 A
+    
+    // 變數宣告
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const captureBtn = document.getElementById('captureBtn');
+    const loadingMsg = document.getElementById('loadingMsg');
+    const inputArea = document.getElementById('inputArea');
+    const boothTitle = document.getElementById('boothTitle');
+    
+    let bgImage = new Image();
+    bgImage.crossOrigin = "anonymous"; // 防止 Canvas 輸出時被 CORS 阻擋
+    
+    // 1. 啟動攝影機
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } })
+        .then(stream => { video.srcObject = stream; })
+        .catch(err => { 
+            loadingMsg.innerText = "🚨 無法存取攝影機，請確認瀏覽器權限設定。";
+            loadingMsg.style.color = "red";
+        });
 
-        const video = document.getElementById('video');
-        const canvas = document.getElementById('canvas');
+    // 2. 向後端索取系統設定與底圖
+    fetch(`${GAS_BACKEND_URL}?action=get_settings`)
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === "success") {
+                const boothData = data.booths.find(b => b.id === boothId);
+                if (boothData) {
+                    boothTitle.innerText = `歡迎來到：${boothData.name}`;
+                    bgImage.src = boothData.bgUrl;
+                    bgImage.onload = () => {
+                        loadingMsg.style.display = "none";
+                        inputArea.style.display = "block";
+                    };
+                } else {
+                    loadingMsg.innerText = `🚨 錯誤：找不到代號為 [${boothId}] 的攤位設定。`;
+                    loadingMsg.style.color = "red";
+                }
+            } else {
+                throw new Error(data.message);
+            }
+        })
+        .catch(err => {
+            loadingMsg.innerText = "🚨 設定檔讀取失敗，請聯絡現場人員。";
+            console.error(err);
+        });
+
+    // 3. 拍照與合成邏輯
+    captureBtn.addEventListener('click', () => {
+        const name = document.getElementById('userName').value.trim();
+        let email = document.getElementById('userEmail').value.trim();
+        
+        if (!name || !email) {
+            alert("請完整填寫姓名與 Email");
+            return;
+        }
+
+        // 強制 Email 轉小寫 (防呆機制)
+        email = email.toLowerCase();
+        
+        captureBtn.disabled = true;
+        captureBtn.innerText = "處理中，請稍候...";
+
+        // 設定 Canvas 尺寸與底圖一致
+        canvas.width = bgImage.width;
+        canvas.height = bgImage.height;
         const ctx = canvas.getContext('2d');
-        const header = document.getElementById('header');
         
-        // 2. 初始化：向 GAS 抓取攤位底圖設定
-        window.onload = async () => {
-            try {
-                const response = await fetch(GAS_BACKEND_URL + "?action=get_settings");
-                const data = await response.json();
-                
-                if (data.status === "success") {
-                    // 在陣列中尋找符合網址參數的攤位代號
-                    const booth = data.booths.find(b => b.id.toUpperCase() === BOOTH_ID);
-                    if (booth) {
-                        boothData = booth;
-                        header.innerText = `📍 目前位置：${booth.name}`;
-                        bgImage.src = booth.bgUrl;
-                        
-                        bgImage.onload = () => {
-                            startCamera();
-                        };
-                        bgImage.onerror = () => {
-                            alert("攤位底圖載入失敗，請確認試算表中填寫的 Postimages 網址是否正確。");
-                        }
-                    } else {
-                        header.innerText = "❌ 找不到此攤位代號";
-                        document.getElementById('loading-text').
+        // 繪製背景圖
+        ctx.drawImage(bgImage, 0, 0, canvas.width, canvas.height);
+        
+        // 計算攝影機畫面寫入位置 (此處以置中為例，請依實際底圖留空位置調整)
+        // 假設要在畫布正中央貼上 400x300 的照片
+        const drawWidth = 400;
+        const drawHeight = 300;
+        const drawX = (canvas.width - drawWidth) / 2;
+        const drawY = (canvas.height - drawHeight) / 2;
+        
+        ctx.drawImage(video, drawX, drawY, drawWidth, drawHeight);
+        
+        // 轉為 Base64
+        const photoData = canvas.toDataURL('image/jpeg', 0.8);
+        
+        // 畫面切換：隱藏攝影機，顯示合成圖與 QR Code
+        video.style.display = "none";
+        inputArea.style.display = "none";
+        canvas.style.display = "block";
+        canvas.style.width = "100%"; 
+        document.getElementById('resultArea').style.display = "block";
+        
+        // 產生 QR Code (使用免費 API)
+        document.getElementById('qrImage').src = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(email)}`;
+        document.getElementById('qrEmailText').innerText = `ID: ${email}`;
+
+        // 背景非同步上傳至 GAS
+        fetch(GAS_BACKEND_URL, {
+            method: 'POST',
+            body: JSON.stringify({
+                action: 'upload_photo',
+                booth: boothId,
+                name: name,
+                email: email,
+                photo: photoData
+            })
+        }).catch(err => {
+            console.warn("上傳延遲，但前端體驗已完成放行", err);
+        });
+    });
+</script>
+
+</body>
+</html>
