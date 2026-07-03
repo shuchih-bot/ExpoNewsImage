@@ -3,30 +3,27 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>POSRICH 服務台核銷系統</title>
+    <title>POSRICH 服務台核銷系統 / Redemption System</title>
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #343a40; color: #fff; margin: 0; padding: 15px; text-align: center; }
         .container { max-width: 500px; margin: 0 auto; background: #212529; padding: 20px; border-radius: 12px; box-shadow: 0 8px 16px rgba(0,0,0,0.5); }
-        h2 { color: #f8f9fa; font-size: 22px; border-bottom: 1px solid #495057; padding-bottom: 15px; margin-top: 0; }
-        .section-title { font-size: 14px; color: #adb5bd; text-align: left; margin-top: 20px; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 1px; }
+        h2 { color: #f8f9fa; font-size: 20px; border-bottom: 1px solid #495057; padding-bottom: 15px; margin-top: 0; line-height: 1.4; }
+        .section-title { font-size: 13px; color: #adb5bd; text-align: left; margin-top: 20px; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 1px; }
         input { width: 100%; padding: 12px; margin-bottom: 15px; border: 1px solid #495057; border-radius: 6px; font-size: 16px; background: #495057; color: #fff; box-sizing: border-box; }
         input:focus { outline: none; border-color: #0d6efd; background: #e9ecef; color: #000; }
         
-        /* 掃描器區塊 */
         #reader { width: 100%; border-radius: 8px; overflow: hidden; margin-bottom: 15px; display: none; background: #000; }
         #scanBtn { background-color: #6c757d; color: white; border: none; padding: 12px; font-size: 16px; border-radius: 6px; cursor: pointer; width: 100%; font-weight: bold; margin-bottom: 15px; }
         
-        /* 按鈕樣式 */
         .btn-group { display: flex; gap: 10px; margin-top: 10px; }
-        .btn-main { background-color: #198754; color: white; border: none; padding: 15px 10px; font-size: 16px; border-radius: 6px; cursor: pointer; width: 100%; font-weight: bold; }
+        .btn-main { background-color: #198754; color: white; border: none; padding: 15px 5px; font-size: 15px; border-radius: 6px; cursor: pointer; width: 100%; font-weight: bold; line-height: 1.3; }
         .btn-main:hover { background-color: #157347; }
-        .btn-warning { background-color: #dc3545; color: white; border: none; padding: 15px 10px; font-size: 16px; border-radius: 6px; cursor: pointer; width: 100%; font-weight: bold; }
+        .btn-warning { background-color: #dc3545; color: white; border: none; padding: 15px 5px; font-size: 15px; border-radius: 6px; cursor: pointer; width: 100%; font-weight: bold; line-height: 1.3; }
         .btn-warning:hover { background-color: #bb2d3b; }
         button:disabled { background-color: #6c757d !important; cursor: not-allowed; opacity: 0.7; }
         
-        /* 提示訊息區 */
-        #statusAlert { display: none; margin-top: 20px; padding: 15px; border-radius: 8px; font-weight: bold; font-size: 16px; line-height: 1.5; }
+        #statusAlert { display: none; margin-top: 20px; padding: 15px; border-radius: 8px; font-weight: bold; font-size: 15px; line-height: 1.6; text-align: left; white-space: pre-wrap; }
         .alert-success { background-color: #d1e7dd; color: #0f5132; border: 1px solid #badbcc; }
         .alert-error { background-color: #f8d7da; color: #842029; border: 1px solid #f5c2c7; }
         .alert-warning { background-color: #fff3cd; color: #664d03; border: 1px solid #ffecb5; }
@@ -35,28 +32,27 @@
 <body>
 
 <div class="container">
-    <h2>🛡️ POSRICH 核銷終端</h2>
+    <h2>🛡️ POSRICH 核銷終端<br><span style="font-size: 16px; color: #adb5bd;">Redemption Terminal</span></h2>
     
-    <div class="section-title">1. 值班人員身分驗證</div>
-    <input type="text" id="staffName" placeholder="請輸入您的姓名 (如: Alice)" required>
-    <input type="number" id="dailyPin" placeholder="請輸入今日核銷密碼 (4碼)" required>
+    <div class="section-title">1. 值班身分 / Staff Auth</div>
+    <input type="text" id="staffName" placeholder="輸入姓名 / Name (e.g. Alice)" required>
+    <input type="password" inputmode="numeric" pattern="[0-9]*" id="dailyPin" placeholder="今日密碼 / Daily PIN (4 digits)" required>
 
-    <div class="section-title">2. 客戶數位護照</div>
-    <button id="scanBtn">📷 開啟相機掃描 QR Code</button>
+    <div class="section-title">2. 數位護照 / Digital Passport</div>
+    <button id="scanBtn">📷 開啟相機掃描 / Scan QR</button>
     <div id="reader"></div>
-    <input type="email" id="customerEmail" placeholder="或手動輸入客戶 Email (全小寫)" required>
+    <input type="email" id="customerEmail" placeholder="輸入客戶 Email / Enter Email" required>
 
-    <div class="section-title">3. 執行發獎操作</div>
+    <div class="section-title">3. 執行核銷 / Action</div>
     <div class="btn-group">
-        <button id="btnStandard" class="btn-main">✔️ 標準兌獎</button>
-        <button id="btnOverride" class="btn-warning">🚨 手動特赦</button>
+        <button id="btnStandard" class="btn-main">✔️ 標準兌獎<br>Standard Redeem</button>
+        <button id="btnOverride" class="btn-warning">🚨 手動特赦<br>Manual Override</button>
     </div>
 
     <div id="statusAlert"></div>
 </div>
 
 <script>
-    // 中央大腦 API 網址 (與拍照系統共用同一個大腦)
     const GAS_BACKEND_URL = "https://script.google.com/macros/s/AKfycbz027yKpTWY-HGKlRS1ScGd2zOH_efBUENCLsPGsA6PABsV_h73ArVMRWJQ_pG8kPI_/exec";
     
     const staffNameInput = document.getElementById('staffName');
@@ -69,55 +65,47 @@
     
     let html5QrcodeScanner;
 
-    // 啟動相機掃描功能
     scanBtn.addEventListener('click', () => {
         document.getElementById('reader').style.display = "block";
         scanBtn.style.display = "none";
-        
         html5QrcodeScanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: {width: 250, height: 250} }, false);
         html5QrcodeScanner.render(onScanSuccess, onScanFailure);
     });
 
     function onScanSuccess(decodedText, decodedResult) {
-        // 掃描成功後，將結果自動填入 Email 欄位，並關閉掃描器
         customerEmailInput.value = decodedText.toLowerCase();
         html5QrcodeScanner.clear();
         document.getElementById('reader').style.display = "none";
         scanBtn.style.display = "block";
-        scanBtn.innerText = "重新開啟相機掃描";
-        showAlert("✅ 掃描成功！請確認下方 Email 並點擊核銷。", "success");
+        scanBtn.innerText = "重新開啟相機 / Restart Camera";
+        showAlert("✅ 掃描成功！請確認 Email 並核銷。\nScan successful! Verify and redeem.", "success");
     }
 
-    function onScanFailure(error) {
-        // 忽略背景持續掃描的錯誤
-    }
+    function onScanFailure(error) {}
 
-    // 發送核銷請求邏輯
     function submitRedeem(type) {
         const staff = staffNameInput.value.trim();
         const pin = dailyPinInput.value.trim();
-        const email = customerEmailInput.value.trim().toLowerCase(); // 強制轉小寫防呆
+        const email = customerEmailInput.value.trim().toLowerCase();
 
-        // 前端初步擋擋
         if (!staff || !pin || !email) {
-            showAlert("請完整填寫值班姓名、密碼與客戶 Email！", "error");
+            showAlert("請完整填寫姓名、密碼與 Email！\nPlease fill in Staff Name, PIN, and Email!", "error");
             return;
         }
         if (pin.length !== 4) {
-            showAlert("今日密碼格式錯誤，必須為 4 位數！", "error");
+            showAlert("密碼必須為 4 位數字！\nPIN must be 4 digits!", "error");
             return;
         }
 
-        // 防靈魂連擊鎖定 (Lock buttons)
         setButtonsState(true);
-        showAlert("⏳ 系統連線驗證中，請稍候...", "warning");
+        showAlert("⏳ 系統連線驗證中，請稍候...\nVerifying with server, please wait...", "warning");
 
         const requestPayload = {
             action: 'redeem',
             staffName: staff,
             pin: pin,
             customerEmail: email,
-            type: type // 'standard' 或 'override'
+            type: type
         };
 
         fetch(GAS_BACKEND_URL, {
@@ -128,44 +116,41 @@
         .then(data => {
             if (data.status === "success") {
                 showAlert(data.message, "success");
-                customerEmailInput.value = ""; // 核銷成功後清空客戶 Email，方便掃下一個
+                customerEmailInput.value = ""; 
             } else if (data.status === "insufficient") {
-                showAlert(data.message, "warning"); // 攤位數不足
+                showAlert(data.message, "warning"); 
             } else {
-                showAlert(data.message, "error"); // 密碼錯誤或已領過獎
+                showAlert(data.message, "error"); 
             }
         })
         .catch(err => {
-            showAlert("🚨 網路連線失敗，請檢查現場網路狀態！", "error");
+            showAlert("🚨 網路連線失敗，請檢查網路狀態！\nNetwork error, please check connection!", "error");
             console.error(err);
         })
         .finally(() => {
-            // 伺服器回傳後解鎖按鈕
             setButtonsState(false);
         });
     }
 
-    // 綁定按鈕事件
     btnStandard.addEventListener('click', () => submitRedeem('standard'));
     btnOverride.addEventListener('click', () => submitRedeem('override'));
 
-    // UI 輔助函式
     function setButtonsState(isDisabled) {
         btnStandard.disabled = isDisabled;
         btnOverride.disabled = isDisabled;
         if(isDisabled) {
-            btnStandard.innerText = "處理中...";
-            btnOverride.innerText = "處理中...";
+            btnStandard.innerHTML = "處理中...<br>Processing...";
+            btnOverride.innerHTML = "處理中...<br>Processing...";
         } else {
-            btnStandard.innerText = "✔️ 標準兌獎";
-            btnOverride.innerText = "🚨 手動特赦";
+            btnStandard.innerHTML = "✔️ 標準兌獎<br>Standard Redeem";
+            btnOverride.innerHTML = "🚨 手動特赦<br>Manual Override";
         }
     }
 
     function showAlert(message, type) {
         statusAlert.style.display = "block";
         statusAlert.innerText = message;
-        statusAlert.className = ""; // reset
+        statusAlert.className = ""; 
         if (type === "success") statusAlert.classList.add("alert-success");
         if (type === "error") statusAlert.classList.add("alert-error");
         if (type === "warning") statusAlert.classList.add("alert-warning");
