@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>POSRICH 展會大螢幕互動展示牆</title>
-    <!-- 引入 Tailwind CSS 提供極簡現代化排版 -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         /* 強制全螢幕、隱藏滾動條、優雅黑色基底 */
@@ -81,44 +80,29 @@
 </head>
 <body class="hide-cursor select-none">
 
-    <!-- ========================================== -->
-    <!-- 1. 模式一：優雅幻燈片 (S) 雙圖層無縫交替 -->
-    <!-- ========================================== -->
     <div id="mode-slideshow" class="mode-container flex items-center justify-center">
         <div class="relative w-[50vw] max-w-[800px] aspect-[4/3] flex items-center justify-center">
-            <!-- 圖層 A -->
             <div id="slide-layer-a" class="photo-card absolute inset-0 opacity-100 transition-opacity duration-1000 ease-in-out">
                 <img id="slide-img-a" src="" alt="Slide A">
             </div>
-            <!-- 圖層 B (緩衝) -->
             <div id="slide-layer-b" class="photo-card absolute inset-0 opacity-0 transition-opacity duration-1000 ease-in-out">
                 <img id="slide-img-b" src="" alt="Slide B">
             </div>
         </div>
     </div>
 
-    <!-- ========================================== -->
-    <!-- 2. 模式二：老式 DVD 彈跳 (D) 邊界碰撞換臉 -->
-    <!-- ========================================== -->
     <div id="mode-dvd" class="mode-container">
         <div id="dvd-box" class="photo-card dvd-active absolute w-[28vw] max-w-[450px]">
             <img id="dvd-img" src="" alt="DVD Photo">
         </div>
     </div>
 
-    <!-- ========================================== -->
-    <!-- 3. 模式三：垂直瀑布流 (W) 三軌視差錯落 -->
-    <!-- ========================================== -->
     <div id="mode-waterfall" class="mode-container flex h-full w-full">
-        <!-- 軌道 1 (往上飄) -->
         <div id="track-0" class="waterfall-track w-1/3 border-r border-neutral-900/40"></div>
-        <!-- 軌道 2 (往下沉) -->
         <div id="track-1" class="waterfall-track w-1/3 border-r border-neutral-900/40"></div>
-        <!-- 軌道 3 (往上飄) -->
         <div id="track-2" class="waterfall-track w-1/3"></div>
     </div>
 
-    <!-- 載入與斷網防呆提示遮罩 -->
     <div id="loading-overlay" class="absolute inset-0 bg-[#0a0a0a] flex flex-col items-center justify-center z-50 transition-opacity duration-500">
         <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-white mb-4"></div>
         <div id="loading-text" class="text-white text-lg font-medium tracking-wide">正在與 POSRICH 大腦連線取得照片...</div>
@@ -140,7 +124,7 @@
         const paramSpeed = parseFloat(urlParams.get('speed')) || 1.0;
 
         // === 2. 全域狀態機與記憶體池 ===
-        let imagePool = [];        // 存放最新 20~25 張照片 URL 陣列
+        let imagePool = [];        // 存放最新照片 URL 陣列
         let activeMode = 'W';      // 當前作用中的動畫模式
         let fetchTimer = null;     // 時鐘 A (背景抓圖)
         let modeTimer = null;      // 時鐘 B (大模式切換)
@@ -174,9 +158,10 @@
                 const data = await response.json();
                 
                 if (data.status === "success" && data.photos && data.photos.length > 0) {
-                    const newUrls = data.photos.map(p => p.url);
+                    // 【核心修復】改用最新直讀網址格式，繞過 Google Drive 安全限制防破圖
+                    const newUrls = data.photos.map(p => `https://lh3.googleusercontent.com/d/${p.id}`);
                     
-                    // 「自動分身術」：如果照片總數極少（例如開展人少），自動自我複製洗牌，直到補滿 20 張防呆
+                    // 「自動分身術」：如果照片總數極少，自動自我複製，直到補滿 20 張防呆
                     let processedPool = [...newUrls];
                     while (processedPool.length < 20) {
                         processedPool = processedPool.concat(newUrls);
@@ -211,7 +196,6 @@
 
         // === 4. 系統初始化與時鐘 B (大模式控制) ===
         function initDisplaySystem() {
-            // 解析大模式路由
             if (paramMode === 'S' || paramMode === 'D' || paramMode === 'W') {
                 switchMode(paramMode);
             } else {
@@ -229,7 +213,6 @@
 
         // 統一過渡與切換視覺場景
         function switchMode(targetMode) {
-            // 停止現有動畫幀與特有時鐘
             if (animationFrameId) {
                 cancelAnimationFrame(animationFrameId);
                 animationFrameId = null;
@@ -239,12 +222,9 @@
                 slideTimer = null;
             }
 
-            // 隱藏所有容器
             document.querySelectorAll('.mode-container').forEach(el => el.classList.remove('active'));
-
             activeMode = targetMode;
 
-            // 啟動指定模式
             if (targetMode === 'S') {
                 document.getElementById('mode-slideshow').classList.add('active');
                 startSlideshow();
@@ -264,21 +244,19 @@
             const imgA = document.getElementById('slide-img-a');
             const imgB = document.getElementById('slide-img-b');
 
-            // 初始化第一張
             slideIndex = 0;
-            imgA.src = imagePool[slideIndex];
             activeSlideLayer = 'A';
             layerA.style.opacity = '1';
             layerB.style.opacity = '0';
+            
+            imgA.onload = () => {};
+            imgA.src = imagePool[slideIndex];
 
-            // 時鐘 C：每 6 秒優雅過場變臉
             slideTimer = setInterval(() => {
                 slideIndex = (slideIndex + 1) % imagePool.length;
                 const nextUrl = imagePool[slideIndex];
 
-                // 幕後更衣室預載入防黑屏
                 const tempImg = new Image();
-                tempImg.src = nextUrl;
                 tempImg.onload = () => {
                     if (activeSlideLayer === 'A') {
                         imgB.src = nextUrl;
@@ -292,6 +270,7 @@
                         activeSlideLayer = 'A';
                     }
                 };
+                tempImg.src = nextUrl;
             }, 6000);
         }
 
@@ -300,18 +279,29 @@
             const dvdBox = document.getElementById('dvd-box');
             const dvdImg = document.getElementById('dvd-img');
 
-            // 隨機重設出發點與角度
             dvdState.index = Math.floor(Math.random() * imagePool.length);
-            dvdImg.src = imagePool[dvdState.index];
+            const firstUrl = imagePool[dvdState.index];
 
-            // 測量卡片實際佔用尺寸
-            dvdState.width = dvdBox.offsetWidth;
-            dvdState.height = dvdBox.offsetHeight;
+            // 確保先給預設安全尺寸，嚴格先綁定 onload 再給 src
+            dvdState.width = dvdBox.offsetWidth || 350;
+            dvdState.height = dvdBox.offsetHeight || 300;
+
+            dvdImg.onload = () => {
+                dvdState.width = dvdBox.offsetWidth || 350;
+                dvdState.height = dvdBox.offsetHeight || 300;
+                
+                if (dvdState.x + dvdState.width > window.innerWidth) {
+                    dvdState.x = window.innerWidth - dvdState.width - 20;
+                }
+                if (dvdState.y + dvdState.height > window.innerHeight) {
+                    dvdState.y = window.innerHeight - dvdState.height - 20;
+                }
+            };
+            dvdImg.src = firstUrl;
 
             dvdState.x = Math.random() * (window.innerWidth - dvdState.width - 100) + 50;
             dvdState.y = Math.random() * (window.innerHeight - dvdState.height - 100) + 50;
             
-            // 基礎速度向量，結合 URL Speed 參數
             const baseVelocity = 3.5 * paramSpeed;
             dvdState.vx = (Math.random() > 0.5 ? 1 : -1) * baseVelocity;
             dvdState.vy = (Math.random() > 0.5 ? 1 : -1) * baseVelocity;
@@ -323,80 +313,71 @@
                 dvdState.y += dvdState.vy;
 
                 let hitEdge = false;
+                const boxW = dvdState.width || 350;
+                const boxH = dvdState.height || 300;
 
-                // 左右邊界碰撞判斷
                 if (dvdState.x <= 0) {
                     dvdState.x = 0;
                     dvdState.vx = -dvdState.vx;
                     hitEdge = true;
-                } else if (dvdState.x + dvdState.width >= window.innerWidth) {
-                    dvdState.x = window.innerWidth - dvdState.width;
+                } else if (dvdState.x + boxW >= window.innerWidth) {
+                    dvdState.x = window.innerWidth - boxW;
                     dvdState.vx = -dvdState.vx;
                     hitEdge = true;
                 }
 
-                // 上下邊界碰撞判斷
                 if (dvdState.y <= 0) {
                     dvdState.y = 0;
                     dvdState.vy = -dvdState.vy;
                     hitEdge = true;
-                } else if (dvdState.y + dvdState.height >= window.innerHeight) {
-                    dvdState.y = window.innerHeight - dvdState.height;
+                } else if (dvdState.y + boxH >= window.innerHeight) {
+                    dvdState.y = window.innerHeight - boxH;
                     dvdState.vy = -dvdState.vy;
                     hitEdge = true;
                 }
 
-                // 物理碰撞觸發換臉事件
                 if (hitEdge) {
                     dvdState.index = (dvdState.index + 1) % imagePool.length;
                     const nextUrl = imagePool[dvdState.index];
 
-                    // 幕後更衣室預載入
                     const preloadImg = new Image();
-                    preloadImg.src = nextUrl;
                     preloadImg.onload = () => {
                         dvdImg.src = nextUrl;
+                        setTimeout(() => {
+                            dvdState.width = dvdBox.offsetWidth || 350;
+                            dvdState.height = dvdBox.offsetHeight || 300;
+                        }, 50);
                     };
+                    preloadImg.src = nextUrl;
 
-                    // 視覺回饋：撞擊時微發光脈衝
                     dvdBox.classList.add('dvd-bump');
                     setTimeout(() => dvdBox.classList.remove('dvd-bump'), 250);
                 }
 
-                // GPU 硬體層渲染加速
                 dvdBox.style.transform = `translate3d(${dvdState.x}px, ${dvdState.y}px, 0)`;
                 animationFrameId = requestAnimationFrame(updatePhysics);
             }
 
-            // 當圖片載入完成，取得精準高度後再啟動物理循環
-            dvdImg.onload = () => {
-                dvdState.width = dvdBox.offsetWidth;
-                dvdState.height = dvdBox.offsetHeight;
-            };
-
             animationFrameId = requestAnimationFrame(updatePhysics);
         }
 
-        // === 7. 模式 W：垂直瀑布流 (GPU加速履帶與雙向視差) ===
+        // === 7. 模式 W：垂直瀑布流 (GPU加速與視差) ===
         function startWaterfall() {
             waterfallPoolIndex = 0;
             const containerWidth = window.innerWidth;
             const trackWidth = containerWidth / 3;
-            const cardWidth = trackWidth * 0.90; // 留下 10% 作為軌道左右呼吸空間
-            const cardHeight = cardWidth * 0.92; // 拍立得高度比例 (含白色底部手寫區)
+            const cardWidth = trackWidth * 0.90;
+            const cardHeight = cardWidth * 0.92;
 
-            // 重構三條軌道
             for (let t = 0; t < 3; t++) {
                 const trackEl = document.getElementById(`track-${t}`);
-                trackEl.innerHTML = ''; // 清空舊畫布
+                trackEl.innerHTML = '';
                 
                 const data = tracksData[t];
                 data.cards = [];
 
-                // 履帶式回收：每個軌道固定發配 4 個 DOM 節點 (正好填滿高度加一個螢幕外緩衝)
                 const cardCount = 4;
                 const screenHeight = window.innerHeight;
-                const spacing = screenHeight / 3; // 精算間距
 
                 for (let c = 0; c < cardCount; c++) {
                     const cardDiv = document.createElement('div');
@@ -405,22 +386,19 @@
                     cardDiv.style.height = `${cardHeight}px`;
 
                     const img = document.createElement('img');
-                    
-                    // 從記憶體池依序提取
                     const picUrl = imagePool[waterfallPoolIndex % imagePool.length];
                     waterfallPoolIndex++;
+
+                    img.onload = () => {};
                     img.src = picUrl;
 
                     cardDiv.appendChild(img);
                     trackEl.appendChild(cardDiv);
 
-                    // 錯落起跑點 (Staggered Offset)：防呆對齊，讓水平線完全打破
                     let initialY = 0;
                     if (data.direction === -1) {
-                        // 往上流動
                         initialY = c * (cardHeight + 40) - 50;
                     } else {
-                        // 往下流動
                         initialY = screenHeight - (c * (cardHeight + 40)) - cardHeight + 50;
                     }
 
@@ -434,12 +412,10 @@
                 }
             }
 
-            // 瀑布流高頻物理主循環
             function updateWaterfallPhysics() {
                 if (activeMode !== 'W') return;
 
                 const screenHeight = window.innerHeight;
-                // 基礎流速
                 const baseSpeed = 1.2 * paramSpeed;
 
                 for (let t = 0; t < 3; t++) {
@@ -448,26 +424,20 @@
 
                     for (let c = 0; c < data.cards.length; c++) {
                         const card = data.cards[c];
-
-                        // 進行物理位移
                         card.y += data.direction * speed;
 
-                        // 履帶邊界回收與無縫變臉判斷
                         if (data.direction === -1) {
-                            // 往上飄：若完全穿透頂部，瞬間平移傳送到底部外
                             if (card.y < -card.height - 40) {
                                 card.y = screenHeight + 20;
                                 recycleCard(card);
                             }
                         } else {
-                            // 往下沉：若完全穿透底部，瞬間平移傳送到頂部外
                             if (card.y > screenHeight + 40) {
                                 card.y = -card.height - 20;
                                 recycleCard(card);
                             }
                         }
 
-                        // 啟動 3D 顯示卡加速
                         card.el.style.transform = `translate3d(0, ${card.y}px, 0)`;
                     }
                 }
@@ -475,23 +445,21 @@
                 animationFrameId = requestAnimationFrame(updateWaterfallPhysics);
             }
 
-            // 履帶出界洗牌與預載入
             function recycleCard(card) {
                 const nextUrl = imagePool[waterfallPoolIndex % imagePool.length];
                 waterfallPoolIndex++;
 
-                // 幕後預載入，100% 防止白框出現
                 const temp = new Image();
-                temp.src = nextUrl;
                 temp.onload = () => {
                     card.imgEl.src = nextUrl;
                 };
+                temp.src = nextUrl;
             }
 
             animationFrameId = requestAnimationFrame(updateWaterfallPhysics);
         }
 
-        // === 8. 滑鼠指標自動隱藏控制 (大螢幕防干擾設計) ===
+        // === 8. 滑鼠指標自動隱藏控制 ===
         let mouseTimer = null;
         document.addEventListener('mousemove', () => {
             document.body.classList.remove('hide-cursor');
@@ -501,15 +469,13 @@
             }, 3000);
         });
 
-        // === 9. 啟動大螢幕背景拉取 (時鐘 A) ===
+        // === 9. 啟動與循環同步 ===
         fetchPhotosBackground();
-        // 每 3 分鐘(時鐘 A) 背景自動跟 GAS 大腦同步最新照片陣列
         fetchTimer = setInterval(fetchPhotosBackground, 3 * 60 * 1000);
 
-        // 監聽螢幕大小變動，自動適應佈局
         window.addEventListener('resize', () => {
             if (activeMode === 'W') {
-                startWaterfall(); // 重新校準寬高比例
+                startWaterfall();
             }
         });
     </script>
