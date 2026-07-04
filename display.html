@@ -41,25 +41,26 @@
             z-index: 10;
         }
 
-        /* 拍立得卡片極致質感：圓角、光澤陰影、硬體渲染加速 */
+        /* 拍立得卡片極致質感：配合直式比例調整四周留白，增加圓角與硬體渲染加速 */
         .photo-card {
             background: #ffffff;
-            padding: 12px 12px 24px 12px;
-            border-radius: 8px;
-            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.6), 0 5px 15px rgba(0, 0, 0, 0.5);
+            padding: 10px 10px 16px 10px;
+            border-radius: 12px;
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.7), 0 5px 15px rgba(0, 0, 0, 0.5);
             box-sizing: border-box;
             will-change: transform;
             transform: translate3d(0, 0, 0);
             backface-visibility: hidden;
         }
 
+        /* 核心規格修復：解鎖 1080 x 1920 的 9:16 黃金直式比例，確保完美縮放、絕不裁切 */
         .photo-card img {
             width: 100%;
             height: auto;
-            aspect-ratio: 4 / 3;
-            object-fit: cover;
-            border-radius: 4px;
-            background-color: #1a1a1a;
+            aspect-ratio: 9 / 16;
+            object-fit: contain;  /* 確保整張直式照片原汁原味完整呈現 */
+            border-radius: 6px;
+            background-color: #111111;
         }
 
         /* DVD 碰撞時的光暈微動效 */
@@ -81,7 +82,7 @@
 <body class="hide-cursor select-none">
 
     <div id="mode-slideshow" class="mode-container flex items-center justify-center">
-        <div class="relative w-[50vw] max-w-[800px] aspect-[4/3] flex items-center justify-center">
+        <div class="relative h-[85vh] aspect-[9/16] flex items-center justify-center">
             <div id="slide-layer-a" class="photo-card absolute inset-0 opacity-100 transition-opacity duration-1000 ease-in-out">
                 <img id="slide-img-a" src="" alt="Slide A">
             </div>
@@ -92,7 +93,7 @@
     </div>
 
     <div id="mode-dvd" class="mode-container">
-        <div id="dvd-box" class="photo-card dvd-active absolute w-[28vw] max-w-[450px]">
+        <div id="dvd-box" class="photo-card dvd-active absolute w-[18vw] max-w-[300px] max-h-[85vh]">
             <img id="dvd-img" src="" alt="DVD Photo">
         </div>
     </div>
@@ -282,13 +283,13 @@
             dvdState.index = Math.floor(Math.random() * imagePool.length);
             const firstUrl = imagePool[dvdState.index];
 
-            // 確保先給預設安全尺寸，嚴格先綁定 onload 再給 src
-            dvdState.width = dvdBox.offsetWidth || 350;
-            dvdState.height = dvdBox.offsetHeight || 300;
+            // 先給予安全的直式初始預設寬高，防止圖片載入完成前尺寸為 0 飛走
+            dvdState.width = dvdBox.offsetWidth || 260;
+            dvdState.height = dvdBox.offsetHeight || 480;
 
             dvdImg.onload = () => {
-                dvdState.width = dvdBox.offsetWidth || 350;
-                dvdState.height = dvdBox.offsetHeight || 300;
+                dvdState.width = dvdBox.offsetWidth || 260;
+                dvdState.height = dvdBox.offsetHeight || 480;
                 
                 if (dvdState.x + dvdState.width > window.innerWidth) {
                     dvdState.x = window.innerWidth - dvdState.width - 20;
@@ -302,7 +303,7 @@
             dvdState.x = Math.random() * (window.innerWidth - dvdState.width - 100) + 50;
             dvdState.y = Math.random() * (window.innerHeight - dvdState.height - 100) + 50;
             
-            const baseVelocity = 3.5 * paramSpeed;
+            const baseVelocity = 3.0 * paramSpeed;
             dvdState.vx = (Math.random() > 0.5 ? 1 : -1) * baseVelocity;
             dvdState.vy = (Math.random() > 0.5 ? 1 : -1) * baseVelocity;
 
@@ -313,8 +314,8 @@
                 dvdState.y += dvdState.vy;
 
                 let hitEdge = false;
-                const boxW = dvdState.width || 350;
-                const boxH = dvdState.height || 300;
+                const boxW = dvdState.width || 260;
+                const boxH = dvdState.height || 480;
 
                 if (dvdState.x <= 0) {
                     dvdState.x = 0;
@@ -344,8 +345,8 @@
                     preloadImg.onload = () => {
                         dvdImg.src = nextUrl;
                         setTimeout(() => {
-                            dvdState.width = dvdBox.offsetWidth || 350;
-                            dvdState.height = dvdBox.offsetHeight || 300;
+                            dvdState.width = dvdBox.offsetWidth || 260;
+                            dvdState.height = dvdBox.offsetHeight || 480;
                         }, 50);
                     };
                     preloadImg.src = nextUrl;
@@ -361,13 +362,15 @@
             animationFrameId = requestAnimationFrame(updatePhysics);
         }
 
-        // === 7. 模式 W：垂直瀑布流 (GPU加速與視差) ===
+        // === 7. 模式 W：垂直瀑布流 (直式尺寸最佳化) ===
         function startWaterfall() {
             waterfallPoolIndex = 0;
             const containerWidth = window.innerWidth;
             const trackWidth = containerWidth / 3;
-            const cardWidth = trackWidth * 0.90;
-            const cardHeight = cardWidth * 0.92;
+            const cardWidth = trackWidth * 0.90; // 留下 10% 作為軌道左右呼吸空間
+            
+            // 精算直式相片牆的完美畫框高度 (符合 9:16 並保留外框增量)
+            const cardHeight = cardWidth * (16 / 9) + 26;
 
             for (let t = 0; t < 3; t++) {
                 const trackEl = document.getElementById(`track-${t}`);
@@ -376,6 +379,7 @@
                 const data = tracksData[t];
                 data.cards = [];
 
+                // 直式照片較修長，畫面上一條軌道配置 4 張（包含螢幕外緩衝）最流暢
                 const cardCount = 4;
                 const screenHeight = window.innerHeight;
 
@@ -395,11 +399,12 @@
                     cardDiv.appendChild(img);
                     trackEl.appendChild(cardDiv);
 
+                    // 調整直式履帶的縱向錯落初始點，確保錯開起跑，不產生大片空白
                     let initialY = 0;
                     if (data.direction === -1) {
-                        initialY = c * (cardHeight + 40) - 50;
+                        initialY = c * (cardHeight + 45) - 100;
                     } else {
-                        initialY = screenHeight - (c * (cardHeight + 40)) - cardHeight + 50;
+                        initialY = screenHeight - (c * (cardHeight + 45)) - cardHeight + 100;
                     }
 
                     data.cards.push({
@@ -416,7 +421,7 @@
                 if (activeMode !== 'W') return;
 
                 const screenHeight = window.innerHeight;
-                const baseSpeed = 1.2 * paramSpeed;
+                const baseSpeed = 1.1 * paramSpeed;
 
                 for (let t = 0; t < 3; t++) {
                     const data = tracksData[t];
