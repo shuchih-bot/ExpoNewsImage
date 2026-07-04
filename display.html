@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>POSRICH 展會大螢幕互動展示牆</title>
+    <!-- 引入 Tailwind CSS 提供極簡現代化排版 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* 強制全螢幕、隱藏滾動條、優雅黑色基底 */
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #0a0a0a;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+
+        /* 隱藏預設滑鼠指標，展會大螢幕專用（移動滑鼠 3 秒後自動隱藏） */
+        .hide-cursor {
+            cursor: none;
+        }
+
+        /* 模式容器共用樣式：無縫絕對定位疊加 */
+        .mode-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 1000ms ease-in-out, visibility 1000ms ease-in-out;
+            z-index: 1;
+        }
+
+        .mode-container.active {
+            opacity: 1;
+            visibility: visible;
+            z-index: 10;
+        }
+
+        /* 拍立得卡片極致質感：圓角、光澤陰影、硬體渲染加速 */
+        .photo-card {
+            background: #ffffff;
+            padding: 12px 12px 24px 12px;
+            border-radius: 8px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.6), 0 5px 15px rgba(0, 0, 0, 0.5);
+            box-sizing: border-box;
+            will-change: transform;
+            transform: translate3d(0, 0, 0);
+            backface-visibility: hidden;
+        }
+
+        .photo-card img {
+            width: 100%;
+            height: auto;
+            aspect-ratio: 4 / 3;
+            object-fit: cover;
+            border-radius: 4px;
+            background-color: #1a1a1a;
+        }
+
+        /* DVD 碰撞時的光暈微動效 */
+        .dvd-active {
+            transition: transform 50ms linear, box-shadow 0.2s ease;
+        }
+        .dvd-bump {
+            box-shadow: 0 0 40px rgba(255, 255, 255, 0.8), 0 5px 15px rgba(0, 0, 0, 0.5) !important;
+        }
+
+        /* 瀑布流軌道：固定寬度相對定位 */
+        .waterfall-track {
+            height: 100%;
+            position: relative;
+            overflow: hidden;
+        }
+    </style>
+</head>
+<body class="hide-cursor select-none">
+
+    <!-- ========================================== -->
+    <!-- 1. 模式一：優雅幻燈片 (S) 雙圖層無縫交替 -->
+    <!-- ========================================== -->
+    <div id="mode-slideshow" class="mode-container flex items-center justify-center">
+        <div class="relative w-[50vw] max-w-[800px] aspect-[4/3] flex items-center justify-center">
+            <!-- 圖層 A -->
+            <div id="slide-layer-a" class="photo-card absolute inset-0 opacity-100 transition-opacity duration-1000 ease-in-out">
+                <img id="slide-img-a" src="" alt="Slide A">
+            </div>
+            <!-- 圖層 B (緩衝) -->
+            <div id="slide-layer-b" class="photo-card absolute inset-0 opacity-0 transition-opacity duration-1000 ease-in-out">
+                <img id="slide-img-b" src="" alt="Slide B">
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- 2. 模式二：老式 DVD 彈跳 (D) 邊界碰撞換臉 -->
+    <!-- ========================================== -->
+    <div id="mode-dvd" class="mode-container">
+        <div id="dvd-box" class="photo-card dvd-active absolute w-[28vw] max-w-[450px]">
+            <img id="dvd-img" src="" alt="DVD Photo">
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- 3. 模式三：垂直瀑布流 (W) 三軌視差錯落 -->
+    <!-- ========================================== -->
+    <div id="mode-waterfall" class="mode-container flex h-full w-full">
+        <!-- 軌道 1 (往上飄) -->
+        <div id="track-0" class="waterfall-track w-1/3 border-r border-neutral-900/40"></div>
+        <!-- 軌道 2 (往下沉) -->
+        <div id="track-1" class="waterfall-track w-1/3 border-r border-neutral-900/40"></div>
+        <!-- 軌道 3 (往上飄) -->
+        <div id="track-2" class="waterfall-track w-1/3"></div>
+    </div>
+
+    <!-- 載入與斷網防呆提示遮罩 -->
+    <div id="loading-overlay" class="absolute inset-0 bg-[#0a0a0a] flex flex-col items-center justify-center z-50 transition-opacity duration-500">
+        <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-white mb-4"></div>
+        <div id="loading-text" class="text-white text-lg font-medium tracking-wide">正在與 POSRICH 大腦連線取得照片...</div>
+    </div>
+
+    <script>
+        // === 1. 基礎設定與參數解析 (URL Parameters Parser) ===
+        const GAS_API_URL = "https://script.google.com/macros/s/AKfycbz027yKpTWY-HGKlRS1ScGd2zOH_efBUENCLsPGsA6PABsV_h73ArVMRWJQ_pG8kPI_/exec";
+        
+        const urlParams = new URLSearchParams(window.location.search);
+        
+        // 模式選擇：S (幻燈片) | D (DVD) | W (瀑布流) | AUTO (自動輪播，預設)
+        const paramMode = (urlParams.get('mode') || 'AUTO').toUpperCase();
+        
+        // 轉場時間 (分)：AUTO 模式下多久切換一次大模式 (預設 3 分鐘)
+        const paramTime = parseFloat(urlParams.get('time')) || 3;
+        
+        // 動畫速度乘數：控制滾動與彈跳速度 (預設 1.0)
+        const paramSpeed = parseFloat(urlParams.get('speed')) || 1.0;
+
+        // === 2. 全域狀態機與記憶體池 ===
+        let imagePool = [];        // 存放最新 20~25 張照片 URL 陣列
+        let activeMode = 'W';      // 當前作用中的動畫模式
+        let fetchTimer = null;     // 時鐘 A (背景抓圖)
+        let modeTimer = null;      // 時鐘 B (大模式切換)
+        let animationFrameId = null; // 全域渲染計時器
+        
+        // 幻燈片 (S) 特有變數
+        let slideIndex = 0;
+        let slideTimer = null;     // 時鐘 C - Slideshow
+        let activeSlideLayer = 'A'; // 'A' or 'B'
+        
+        // DVD (D) 特有變數
+        const dvdState = {
+            x: 100, y: 100,
+            vx: 3, vy: 2,
+            width: 0, height: 0,
+            index: 0
+        };
+
+        // 瀑布流 (W) 特有變數
+        const tracksData = [
+            { direction: -1, speedMult: 1.0, cards: [] }, // 軌道 1 (往上 -1)
+            { direction: 1,  speedMult: 0.8, cards: [] }, // 軌道 2 (往下 1)
+            { direction: -1, speedMult: 1.2, cards: [] }  // 軌道 3 (往上 -1)
+        ];
+        let waterfallPoolIndex = 0;
+
+        // === 3. 時鐘 A：靜默背景抓圖 (不重置畫面，3分鐘一次) ===
+        async function fetchPhotosBackground() {
+            try {
+                const response = await fetch(`${GAS_API_URL}?action=getPhotos`);
+                const data = await response.json();
+                
+                if (data.status === "success" && data.photos && data.photos.length > 0) {
+                    const newUrls = data.photos.map(p => p.url);
+                    
+                    // 「自動分身術」：如果照片總數極少（例如開展人少），自動自我複製洗牌，直到補滿 20 張防呆
+                    let processedPool = [...newUrls];
+                    while (processedPool.length < 20) {
+                        processedPool = processedPool.concat(newUrls);
+                    }
+                    
+                    // 隨機洗牌機制，增加大螢幕亂數感
+                    imagePool = processedPool.slice(0, 30); // 最多取 30 張確保效能
+                    
+                    document.getElementById('loading-overlay').classList.add('opacity-0');
+                    setTimeout(() => {
+                        document.getElementById('loading-overlay').style.display = 'none';
+                    }, 500);
+
+                    // 首次加載初始化
+                    if (!animationFrameId) {
+                        initDisplaySystem();
+                    }
+                } else {
+                    showLoadingError("大腦中尚無照片紀錄，請先使用手機打卡拍照！");
+                }
+            } catch (error) {
+                console.error("Fetch Error:", error);
+                showLoadingError("網路通訊異常，請確認 API 狀態或大螢幕網路連線！");
+            }
+        }
+
+        function showLoadingError(msg) {
+            document.getElementById('loading-text').innerText = `⚠️ ${msg}`;
+            document.getElementById('loading-overlay').classList.remove('opacity-0');
+            document.getElementById('loading-overlay').style.display = 'flex';
+        }
+
+        // === 4. 系統初始化與時鐘 B (大模式控制) ===
+        function initDisplaySystem() {
+            // 解析大模式路由
+            if (paramMode === 'S' || paramMode === 'D' || paramMode === 'W') {
+                switchMode(paramMode);
+            } else {
+                // AUTO 模式：啟動時鐘 B，每 n 分鐘循環切換
+                const modes = ['W', 'S', 'D'];
+                let currentModeIdx = 0;
+                switchMode(modes[currentModeIdx]);
+
+                modeTimer = setInterval(() => {
+                    currentModeIdx = (currentModeIdx + 1) % modes.length;
+                    switchMode(modes[currentModeIdx]);
+                }, paramTime * 60 * 1000);
+            }
+        }
+
+        // 統一過渡與切換視覺場景
+        function switchMode(targetMode) {
+            // 停止現有動畫幀與特有時鐘
+            if (animationFrameId) {
+                cancelAnimationFrame(animationFrameId);
+                animationFrameId = null;
+            }
+            if (slideTimer) {
+                clearInterval(slideTimer);
+                slideTimer = null;
+            }
+
+            // 隱藏所有容器
+            document.querySelectorAll('.mode-container').forEach(el => el.classList.remove('active'));
+
+            activeMode = targetMode;
+
+            // 啟動指定模式
+            if (targetMode === 'S') {
+                document.getElementById('mode-slideshow').classList.add('active');
+                startSlideshow();
+            } else if (targetMode === 'D') {
+                document.getElementById('mode-dvd').classList.add('active');
+                startDVDBounce();
+            } else if (targetMode === 'W') {
+                document.getElementById('mode-waterfall').classList.add('active');
+                startWaterfall();
+            }
+        }
+
+        // === 5. 模式 S：優雅幻燈片 (時鐘 C - 雙層緩衝機制) ===
+        function startSlideshow() {
+            const layerA = document.getElementById('slide-layer-a');
+            const layerB = document.getElementById('slide-layer-b');
+            const imgA = document.getElementById('slide-img-a');
+            const imgB = document.getElementById('slide-img-b');
+
+            // 初始化第一張
+            slideIndex = 0;
+            imgA.src = imagePool[slideIndex];
+            activeSlideLayer = 'A';
+            layerA.style.opacity = '1';
+            layerB.style.opacity = '0';
+
+            // 時鐘 C：每 6 秒優雅過場變臉
+            slideTimer = setInterval(() => {
+                slideIndex = (slideIndex + 1) % imagePool.length;
+                const nextUrl = imagePool[slideIndex];
+
+                // 幕後更衣室預載入防黑屏
+                const tempImg = new Image();
+                tempImg.src = nextUrl;
+                tempImg.onload = () => {
+                    if (activeSlideLayer === 'A') {
+                        imgB.src = nextUrl;
+                        layerA.style.opacity = '0';
+                        layerB.style.opacity = '1';
+                        activeSlideLayer = 'B';
+                    } else {
+                        imgA.src = nextUrl;
+                        layerA.style.opacity = '1';
+                        layerB.style.opacity = '0';
+                        activeSlideLayer = 'A';
+                    }
+                };
+            }, 6000);
+        }
+
+        // === 6. 模式 D：老式 DVD 彈跳 (邊界碰撞換臉) ===
+        function startDVDBounce() {
+            const dvdBox = document.getElementById('dvd-box');
+            const dvdImg = document.getElementById('dvd-img');
+
+            // 隨機重設出發點與角度
+            dvdState.index = Math.floor(Math.random() * imagePool.length);
+            dvdImg.src = imagePool[dvdState.index];
+
+            // 測量卡片實際佔用尺寸
+            dvdState.width = dvdBox.offsetWidth;
+            dvdState.height = dvdBox.offsetHeight;
+
+            dvdState.x = Math.random() * (window.innerWidth - dvdState.width - 100) + 50;
+            dvdState.y = Math.random() * (window.innerHeight - dvdState.height - 100) + 50;
+            
+            // 基礎速度向量，結合 URL Speed 參數
+            const baseVelocity = 3.5 * paramSpeed;
+            dvdState.vx = (Math.random() > 0.5 ? 1 : -1) * baseVelocity;
+            dvdState.vy = (Math.random() > 0.5 ? 1 : -1) * baseVelocity;
+
+            function updatePhysics() {
+                if (activeMode !== 'D') return;
+
+                dvdState.x += dvdState.vx;
+                dvdState.y += dvdState.vy;
+
+                let hitEdge = false;
+
+                // 左右邊界碰撞判斷
+                if (dvdState.x <= 0) {
+                    dvdState.x = 0;
+                    dvdState.vx = -dvdState.vx;
+                    hitEdge = true;
+                } else if (dvdState.x + dvdState.width >= window.innerWidth) {
+                    dvdState.x = window.innerWidth - dvdState.width;
+                    dvdState.vx = -dvdState.vx;
+                    hitEdge = true;
+                }
+
+                // 上下邊界碰撞判斷
+                if (dvdState.y <= 0) {
+                    dvdState.y = 0;
+                    dvdState.vy = -dvdState.vy;
+                    hitEdge = true;
+                } else if (dvdState.y + dvdState.height >= window.innerHeight) {
+                    dvdState.y = window.innerHeight - dvdState.height;
+                    dvdState.vy = -dvdState.vy;
+                    hitEdge = true;
+                }
+
+                // 物理碰撞觸發換臉事件
+                if (hitEdge) {
+                    dvdState.index = (dvdState.index + 1) % imagePool.length;
+                    const nextUrl = imagePool[dvdState.index];
+
+                    // 幕後更衣室預載入
+                    const preloadImg = new Image();
+                    preloadImg.src = nextUrl;
+                    preloadImg.onload = () => {
+                        dvdImg.src = nextUrl;
+                    };
+
+                    // 視覺回饋：撞擊時微發光脈衝
+                    dvdBox.classList.add('dvd-bump');
+                    setTimeout(() => dvdBox.classList.remove('dvd-bump'), 250);
+                }
+
+                // GPU 硬體層渲染加速
+                dvdBox.style.transform = `translate3d(${dvdState.x}px, ${dvdState.y}px, 0)`;
+                animationFrameId = requestAnimationFrame(updatePhysics);
+            }
+
+            // 當圖片載入完成，取得精準高度後再啟動物理循環
+            dvdImg.onload = () => {
+                dvdState.width = dvdBox.offsetWidth;
+                dvdState.height = dvdBox.offsetHeight;
+            };
+
+            animationFrameId = requestAnimationFrame(updatePhysics);
+        }
+
+        // === 7. 模式 W：垂直瀑布流 (GPU加速履帶與雙向視差) ===
+        function startWaterfall() {
+            waterfallPoolIndex = 0;
+            const containerWidth = window.innerWidth;
+            const trackWidth = containerWidth / 3;
+            const cardWidth = trackWidth * 0.90; // 留下 10% 作為軌道左右呼吸空間
+            const cardHeight = cardWidth * 0.92; // 拍立得高度比例 (含白色底部手寫區)
+
+            // 重構三條軌道
+            for (let t = 0; t < 3; t++) {
+                const trackEl = document.getElementById(`track-${t}`);
+                trackEl.innerHTML = ''; // 清空舊畫布
+                
+                const data = tracksData[t];
+                data.cards = [];
+
+                // 履帶式回收：每個軌道固定發配 4 個 DOM 節點 (正好填滿高度加一個螢幕外緩衝)
+                const cardCount = 4;
+                const screenHeight = window.innerHeight;
+                const spacing = screenHeight / 3; // 精算間距
+
+                for (let c = 0; c < cardCount; c++) {
+                    const cardDiv = document.createElement('div');
+                    cardDiv.className = 'photo-card absolute left-[5%]';
+                    cardDiv.style.width = `${cardWidth}px`;
+                    cardDiv.style.height = `${cardHeight}px`;
+
+                    const img = document.createElement('img');
+                    
+                    // 從記憶體池依序提取
+                    const picUrl = imagePool[waterfallPoolIndex % imagePool.length];
+                    waterfallPoolIndex++;
+                    img.src = picUrl;
+
+                    cardDiv.appendChild(img);
+                    trackEl.appendChild(cardDiv);
+
+                    // 錯落起跑點 (Staggered Offset)：防呆對齊，讓水平線完全打破
+                    let initialY = 0;
+                    if (data.direction === -1) {
+                        // 往上流動
+                        initialY = c * (cardHeight + 40) - 50;
+                    } else {
+                        // 往下流動
+                        initialY = screenHeight - (c * (cardHeight + 40)) - cardHeight + 50;
+                    }
+
+                    data.cards.push({
+                        el: cardDiv,
+                        imgEl: img,
+                        y: initialY,
+                        width: cardWidth,
+                        height: cardHeight
+                    });
+                }
+            }
+
+            // 瀑布流高頻物理主循環
+            function updateWaterfallPhysics() {
+                if (activeMode !== 'W') return;
+
+                const screenHeight = window.innerHeight;
+                // 基礎流速
+                const baseSpeed = 1.2 * paramSpeed;
+
+                for (let t = 0; t < 3; t++) {
+                    const data = tracksData[t];
+                    const speed = baseSpeed * data.speedMult;
+
+                    for (let c = 0; c < data.cards.length; c++) {
+                        const card = data.cards[c];
+
+                        // 進行物理位移
+                        card.y += data.direction * speed;
+
+                        // 履帶邊界回收與無縫變臉判斷
+                        if (data.direction === -1) {
+                            // 往上飄：若完全穿透頂部，瞬間平移傳送到底部外
+                            if (card.y < -card.height - 40) {
+                                card.y = screenHeight + 20;
+                                recycleCard(card);
+                            }
+                        } else {
+                            // 往下沉：若完全穿透底部，瞬間平移傳送到頂部外
+                            if (card.y > screenHeight + 40) {
+                                card.y = -card.height - 20;
+                                recycleCard(card);
+                            }
+                        }
+
+                        // 啟動 3D 顯示卡加速
+                        card.el.style.transform = `translate3d(0, ${card.y}px, 0)`;
+                    }
+                }
+
+                animationFrameId = requestAnimationFrame(updateWaterfallPhysics);
+            }
+
+            // 履帶出界洗牌與預載入
+            function recycleCard(card) {
+                const nextUrl = imagePool[waterfallPoolIndex % imagePool.length];
+                waterfallPoolIndex++;
+
+                // 幕後預載入，100% 防止白框出現
+                const temp = new Image();
+                temp.src = nextUrl;
+                temp.onload = () => {
+                    card.imgEl.src = nextUrl;
+                };
+            }
+
+            animationFrameId = requestAnimationFrame(updateWaterfallPhysics);
+        }
+
+        // === 8. 滑鼠指標自動隱藏控制 (大螢幕防干擾設計) ===
+        let mouseTimer = null;
+        document.addEventListener('mousemove', () => {
+            document.body.classList.remove('hide-cursor');
+            clearTimeout(mouseTimer);
+            mouseTimer = setTimeout(() => {
+                document.body.classList.add('hide-cursor');
+            }, 3000);
+        });
+
+        // === 9. 啟動大螢幕背景拉取 (時鐘 A) ===
+        fetchPhotosBackground();
+        // 每 3 分鐘(時鐘 A) 背景自動跟 GAS 大腦同步最新照片陣列
+        fetchTimer = setInterval(fetchPhotosBackground, 3 * 60 * 1000);
+
+        // 監聽螢幕大小變動，自動適應佈局
+        window.addEventListener('resize', () => {
+            if (activeMode === 'W') {
+                startWaterfall(); // 重新校準寬高比例
+            }
+        });
+    </script>
+</body>
+</html>
